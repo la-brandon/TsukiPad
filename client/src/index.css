@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom colors and gradient */
+:root {
+  --background-gradient: linear-gradient(to bottom right, #cce7ff, #e6f0ff, #d0ebff);
+  --card-background: rgba(255, 255, 255, 0.8);
+  --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 0.5rem;
+}
+
+/* Apply gradient background to body */
+body {
+  @apply font-sans antialiased;
+  background: var(--background-gradient);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card styling for weather display */
+.weather-card {
+  background: var(--card-background);
+  box-shadow: var(--card-shadow);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+/* Inputs styling */
+input {
+  @apply p-2 rounded border border-gray-300;
+}
+
+/* Buttons styling */
+button {
+  @apply px-4 py-2 rounded bg-blue-400 text-white hover:bg-blue-500 transition-colors;
+}

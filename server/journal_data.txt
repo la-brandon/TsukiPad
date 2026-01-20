@@ -1,0 +1,113 @@
+[
+  {
+    "date": "2023-07-27",
+    "title": "Brandon's Bday",
+    "time": "3PM",
+    "text": "This was my birthday and I went out to eat japanese food, and this was my fit for the day...",
+    "photos": [
+      "/uploads/1694997406288-photo.jpg"
+    ]
+  },
+  {
+    "date": "2023-03-21",
+    "title": "Nancy's Bday",
+    "time": "3PM",
+    "text": "This day we went to party !!!",
+    "photos": [
+      "/uploads/1695100095200-photo.jpg"
+    ]
+  },
+  {
+    "date": "2023-09-06",
+    "title": "first day of school",
+    "time": "",
+    "text": "No title, first day of school...",
+    "photos": [
+      "/uploads/1695100253421-photo.jpg"
+    ]
+  },
+  {
+    "date": "2023-09-20",
+    "title": "Testing",
+    "time": "",
+    "text": "asd",
+    "photos": [
+      "/uploads/1699350290824-E72JmZpUYAQjKYS.jpg"
+    ]
+  },
+  {
+    "date": "2023-09-05",
+    "title": "lily frog",
+    "time": "",
+    "text": "wee",
+    "photos": [
+      "/uploads/1699350391355-E72JmZoVkAMdC0Y.jfif"
+    ]
+  },
+  {
+    "date": "2023-09-12",
+    "title": "working on it",
+    "time": "",
+    "text": "woo",
+    "photos": [
+      "/uploads/1699350458590-E72JmZpVIAErBdd.jpg"
+    ]
+  },
+  {
+    "date": "2023-12-25",
+    "title": "Christmas Day",
+    "time": "",
+    "text": "PARTY ON CHRISTMAS HOPEFULLY",
+    "photos": [
+      "/uploads/1703213553024-LWCC_dd.png"
+    ]
+  },
+  {
+    "date": "2024-04-25",
+    "title": "hayli bday",
+    "time": "",
+    "text": "",
+    "photos": [
+      "/uploads/1704859240646-final_0.0001_plot.png"
+    ]
+  },
+  {
+    "date": "2026-01-07",
+    "title": "merging my apps !",
+    "time": "",
+    "text": "today im merging my calendar and weather app into one to make a semi-decent project lol...",
+    "photos": []
+  },
+  {
+    "date": "2026-01-08",
+    "title": "Nancy UTSC",
+    "time": "",
+    "text": "Nancy's going to UTSC with Gabi to dilly-dally",
+    "photos": []
+  },
+  {
+    "date": "2026-01-10",
+    "title": "Working on the project",
+    "time": "04:00",
+    "text": "",
+    "photos": [
+      "/uploads/1768038009393-lilypichuFROG.png"
+    ]
+  },
+  {
+    "date": "2026-01-11",
+    "title": "testing please !!!",
+    "time": "",
+    "text": "",
+    "color": "purple",
+    "photos": []
+  },
+  {
+    "date": "2026-01-12",
+    "title": "testing colors again",
+    "time": "",
+    "text": "",
+    "color": "red",
+    "photos": []
+  }
+]
