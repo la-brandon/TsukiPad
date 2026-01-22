@@ -189,9 +189,9 @@ function App() {
         {/* Sidebar */}
         <aside className="col-span-12 md:col-span-4 lg:col-span-3 space-y-4 h-full overflow-auto">
           <div className="bg-white/70 rounded-xl border p-3">
-            <h1 className="text-xl font-bold">tsukiCalendar</h1>
+            <h1 className="text-xl font-bold">TsukiPad</h1>
             <p className="text-xs text-gray-600 mt-1">
-              Weather + memories + reminders
+              Memory Calendar Journal
             </p>
           </div>
 

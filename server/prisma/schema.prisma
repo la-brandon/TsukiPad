@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  entries Entry[]
+}
+
+model Entry {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date  String
+  title String
+  time  String? // optional
+  text  String? // optional
+  color String  @default("blue")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  photos Photo[]
+}
+
+model Photo {
+  id      Int   @id @default(autoincrement())
+  entryId Int
+  entry   Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  path String
+}
