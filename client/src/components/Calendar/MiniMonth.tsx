@@ -80,8 +80,8 @@ const MiniMonth: React.FC<MiniMonthProps> = ({
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-[11px] text-gray-500 mb-1">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
-                    <div key={d} className="text-center font-semibold">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                    <div key={`${d}-${i}`} className="text-center font-semibold">
                         {d}
                     </div>
                 ))}

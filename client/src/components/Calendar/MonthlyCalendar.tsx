@@ -20,8 +20,8 @@
 
 
 import React from 'react';
-import { JournalEntry, WeatherSummary, EntriesByDate, ForecastByDate } from '../../types';
-
+import { JournalEntry, EntriesByDate, ForecastByDate } from '../../types';
+import { noteBg } from '../../lib/noteColors';
 
 type MonthlyCalendarProps = {
     currentMonth: Date;
@@ -40,20 +40,6 @@ function formatDate(d: Date): string {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-}
-
-function noteBg(color: string) {
-    switch (color) {
-        case 'red': return 'bg-red-100 border-red-200 text-red-900';
-        case 'orange': return 'bg-orange-100 border-orange-200 text-orange-900';
-        case 'yellow': return 'bg-yellow-100 border-yellow-200 text-yellow-900';
-        case 'green': return 'bg-green-100 border-green-200 text-green-900';
-        case 'blue': return 'bg-blue-100 border-blue-200 text-blue-900';
-        case 'purple': return 'bg-purple-100 border-purple-200 text-purple-900';
-        case 'pink': return 'bg-pink-100 border-pink-200 text-pink-900';
-        case 'gray': return 'bg-gray-100 border-gray-200 text-gray-900';
-        default: return 'bg-blue-100 border-blue-200 text-blue-900';
-    }
 }
 
 

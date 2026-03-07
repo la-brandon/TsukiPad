@@ -1,12 +1,72 @@
+require("dotenv/config");
+
 const express = require("express");
+const session = require("express-session");
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs").promises; // Use the 'fs' module to read/write to text files
+const fs = require("fs").promises;
+const fsSync = require("fs");
 const cors = require("cors");
 
-const app = express();
+const { prisma } = require("./src/db");
+const authRouter = require("./src/routes/auth");
 
-// Define multer storage
+const app = express();
+const PORT = 3000;
+
+// Ensure uploads directory exists at startup
+if (!fsSync.existsSync("uploads")) fsSync.mkdirSync("uploads");
+
+// ---------- helpers ----------
+function requireAuth(req, res, next) {
+  if (!req.session?.userId) return res.status(401).json({ error: "Not authenticated" });
+  next();
+}
+
+function shapeEntry(e) {
+  return {
+    id: e.id,
+    date: e.date,
+    title: e.title,
+    time: e.time,
+    text: e.text,
+    color: e.color,
+    photos: (e.photos ?? []).map((p) => p.path),
+  };
+}
+
+async function ensureUploadsDir() {
+  if (!fsSync.existsSync("uploads")) fsSync.mkdirSync("uploads");
+}
+
+// ---------- middleware ----------
+app.use("/uploads", express.static("uploads"));
+
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "dev-secret-change-me",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false, // set true when you deploy behind HTTPS
+    },
+  })
+);
+
+app.use("/auth", authRouter);
+
+// ---------- uploads (multer) ----------
 const storage = multer.diskStorage({
   destination: "uploads/",
   filename: (req, file, cb) => {
@@ -14,58 +74,173 @@ const storage = multer.diskStorage({
     cb(null, file.fieldname + "-" + uniqueSuffix);
   },
 });
-const upload = multer({ storage: storage });
+const upload = multer({ storage });
 
-app.use("/uploads", express.static("uploads"));
-// Middleware to parse JSON bodies
-app.use(cors());
-app.use(express.json());
-
-
-// API route to fetch all journal entries
-app.get("/api/journal/all", async (req, res) => {
+// ---------- routes ----------
+app.get("/api/journal/all", requireAuth, async (req, res) => {
   try {
-    const allEntries = await getAllJournalEntriesFromFile(); // Read data from the text file
-    res.json(allEntries);
+    const userId = req.session.userId;
+
+    const entries = await prisma.entry.findMany({
+      where: { userId },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      include: { photos: true },
+    });
+
+    res.json(entries.map(shapeEntry));
   } catch (error) {
     console.error("Error fetching all journal entries:", error);
     res.status(500).json({ error: "Failed to fetch journal entries" });
   }
 });
 
-// API route to get journal entry by date
-app.get("/api/journal/:date", async (req, res) => {
-  const date = req.params.date;
+app.get("/api/journal/:date", requireAuth, async (req, res) => {
   try {
-    const journalEntry = await getJournalEntryByDateFromFile(date); // Read data from the text file
-    res.json(journalEntry);
+    const userId = req.session.userId;
+    const date = req.params.date;
+
+    const entries = await prisma.entry.findMany({
+      where: { userId, date },
+      orderBy: [{ time: "asc" }, { createdAt: "asc" }],
+      include: { photos: true },
+    });
+
+    res.json(entries.map(shapeEntry));
   } catch (error) {
     console.error("Error fetching journal entry:", error);
     res.status(500).json({ error: "Failed to fetch journal entry" });
   }
 });
 
-// API route to create a new journal entry
-app.post("/api/journal", upload.array("photos"), async (req, res) => {
-  const { date, title, time, text, color } = req.body;
-  const photoFiles = Array.isArray(req.files) ? req.files : [];
+app.post("/api/journal", requireAuth, upload.array("photos"), async (req, res) => {
   try {
-    await createJournalEntryInFile(date, title, time, text, color, photoFiles); // Write data to the text file
-    res.json({ success: true });
+    const userId = req.session.userId;
+    const { date, title, time, text, color } = req.body;
+    const photoFiles = Array.isArray(req.files) ? req.files : [];
+
+    if (!date || !title) {
+      return res.status(400).json({ error: "date and title are required" });
+    }
+
+    await ensureUploadsDir();
+
+    // Move uploaded files into /uploads and record paths
+    const photoPaths = [];
+    await Promise.all(
+      photoFiles.map(async (file) => {
+        const uniqueFileName = `${Date.now()}-${file.originalname}`;
+        const filePath = path.join(__dirname, "uploads", uniqueFileName);
+        await fs.rename(file.path, filePath);
+        photoPaths.push(`/uploads/${uniqueFileName}`);
+      })
+    );
+
+    const created = await prisma.entry.create({
+      data: {
+        userId,
+        date,
+        title,
+        time: time || null,
+        text: text || null,
+        color: color || "blue",
+        photos: {
+          create: photoPaths.map((p) => ({ path: p })),
+        },
+      },
+      include: { photos: true },
+    });
+
+    res.json({ success: true, entry: shapeEntry(created) });
   } catch (error) {
     console.error("Error creating journal entry:", error);
     res.status(500).json({ error: "Failed to create journal entry" });
   }
 });
 
-// API route to get calendar data for the current week
-app.get("/api/calendar/week", async (req, res) => {
+app.put("/api/journal/entry/:id", requireAuth, async (req, res) => {
   try {
-    const entries = await getAllJournalEntriesFromFile();
+    const userId = req.session.userId;
+    const id = Number(req.params.id);
 
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+
+    const { title, time, text, color } = req.body ?? {};
+
+    // Only allow updating known fields
+    const data = {
+      ...(title !== undefined ? { title } : {}),
+      ...(time !== undefined ? { time: time || null } : {}),
+      ...(text !== undefined ? { text: text || null } : {}),
+      ...(color !== undefined ? { color } : {}),
+    };
+
+    const existing = await prisma.entry.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existing) return res.status(404).json({ error: "Entry not found" });
+
+    const updated = await prisma.entry.update({
+      where: { id },
+      data,
+      include: { photos: true },
+    });
+
+    res.json({ success: true, entry: shapeEntry(updated) });
+  } catch (error) {
+    console.error("Error updating journal entry:", error);
+    res.status(500).json({ error: "Failed to update journal entry" });
+  }
+});
+
+app.delete("/api/journal/entry/:id", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const id = Number(req.params.id);
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+
+    const existing = await prisma.entry.findFirst({
+      where: { id, userId },
+      include: { photos: true },
+    });
+
+    if (!existing) return res.status(404).json({ error: "Entry not found" });
+
+    // OPTIONAL: remove files from disk too
+    // (DB will cascade-delete Photo rows, but files remain unless you delete them)
+    await Promise.all(
+      (existing.photos ?? []).map(async (p) => {
+        // p.path looks like "/uploads/filename"
+        const filename = p.path.replace("/uploads/", "");
+        const filepath = path.join(__dirname, "uploads", filename);
+        try {
+          await fs.unlink(filepath);
+        } catch {
+          // ignore missing file
+        }
+      })
+    );
+
+    await prisma.entry.delete({ where: { id } });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting journal entry:", error);
+    res.status(500).json({ error: "Failed to delete journal entry" });
+  }
+});
+
+
+app.get("/api/calendar/week", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
     const today = new Date();
 
-    // Start week on Sunday (matches JS getDay)
     const startOfWeek = new Date(today);
     startOfWeek.setHours(0, 0, 0, 0);
     startOfWeek.setDate(today.getDate() - today.getDay());
@@ -73,133 +248,26 @@ app.get("/api/calendar/week", async (req, res) => {
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 7);
 
-    const thisWeek = entries.filter(entry => {
+    // Fetch user entries and filter to week
+    const entries = await prisma.entry.findMany({
+      where: { userId },
+      include: { photos: true },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    });
+
+    const thisWeek = entries.filter((entry) => {
       const entryDate = new Date(entry.date);
       return entryDate >= startOfWeek && entryDate < endOfWeek;
     });
 
-    res.json(thisWeek);
+    res.json(thisWeek.map(shapeEntry));
   } catch (error) {
     console.error("Error fetching weekly calendar:", error);
     res.status(500).json({ error: "Failed to fetch weekly calendar" });
   }
 });
 
-// API route to edit an entry
-app.put('/api/journal/entry/:index', async (req, res) => {
-  try {
-    const index = parseInt(req.params.index, 10);
-    const { title, time, text } = req.body;
-
-    if (Number.isNaN(index)) {
-      return res.status(400).json({ error: 'Invalid index' });
-    }
-
-    const entries = await getAllJournalEntriesFromFile();
-
-    if (index < 0 || index >= entries.length) {
-      return res.status(404).json({ error: 'Entry not found' });
-    }
-
-    const entry = entries[index];
-
-    // Update fields but keep others (like photos, date)
-    entries[index] = {
-      ...entry,
-      title: title ?? entry.title,
-      time: time ?? entry.time,
-      text: text ?? entry.text,
-    };
-
-    await fs.writeFile('journal_data.txt', JSON.stringify(entries, null, 2));
-
-    res.json(entries[index]);
-  } catch (error) {
-    console.error('Error updating journal entry:', error);
-    res.status(500).json({ error: 'Failed to update journal entry' });
-  }
-});
-
-// API route to delete entry
-app.delete('/api/journal/entry/:index', async (req, res) => {
-  try {
-    const index = parseInt(req.params.index, 10);
-
-    if (Number.isNaN(index)) {
-      return res.status(400).json({ error: 'Invalid index' });
-    }
-
-    const entries = await getAllJournalEntriesFromFile();
-
-    if (index < 0 || index >= entries.length) {
-      return res.status(404).json({ error: 'Entry not found' });
-    }
-
-    entries.splice(index, 1);
-
-    await fs.writeFile('journal_data.txt', JSON.stringify(entries, null, 2));
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting journal entry:', error);
-    res.status(500).json({ error: 'Failed to delete journal entry' });
-  }
-});
-
-
-// Function to read all journal entries from the text file
-async function getAllJournalEntriesFromFile() {
-  try {
-    const data = await fs.readFile("journal_data.txt", "utf-8");
-    return JSON.parse(data) || [];
-  } catch (error) {
-    throw error;
-  }
-}
-
-// Function to read a journal entry by date from the text file
-async function getJournalEntryByDateFromFile(date) {
-  try {
-    const data = await fs.readFile("journal_data.txt", "utf-8");
-    const entries = JSON.parse(data) || [];
-    return entries.find((entry) => entry.date === date) || null;
-  } catch (error) {
-    throw error;
-  }
-}
-
-// Function to create a new journal entry and write it to the text file
-async function createJournalEntryInFile(date, title, time, text, color, photoFiles) {
-  try {
-    const existingEntries = await getAllJournalEntriesFromFile();
-    const photoReferences = [];
-
-    // Save each photo as a separate file and store its reference
-    const files = Array.isArray(photoFiles) ? photoFiles : [];
-
-    await Promise.all(
-      files.map(async (file) => {
-        const uniqueFileName = `${Date.now()}-${file.originalname}`;
-        const filePath = path.join(__dirname, "uploads", uniqueFileName);
-        await fs.rename(file.path, filePath);
-        photoReferences.push(`/uploads/${uniqueFileName}`);
-      })
-    );
-
-    const newEntry = { date, title, time, text, color: color || "blue", photos: photoReferences };
-    existingEntries.push(newEntry);
-
-    await fs.writeFile(
-      "journal_data.txt",
-      JSON.stringify(existingEntries, null, 2)
-    );
-  } catch (error) {
-    throw error;
-  }
-}
-
-// Start the server
-const PORT = 3000;
+// ---------- start ----------
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

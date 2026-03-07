@@ -4,15 +4,20 @@
   "description": "Calendar app with weather integration",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "dev": "node server.js"
   },
   "dependencies": {
+    "@prisma/adapter-libsql": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "express": "^4.17.1",
+    "express-session": "^1.19.0",
     "multer": "^1.4.2"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/express-session": "^1.18.2",
     "@types/node": "^25.0.10",
     "dotenv": "^17.2.3",
     "prisma": "^7.3.0",

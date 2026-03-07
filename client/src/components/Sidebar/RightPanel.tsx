@@ -16,7 +16,7 @@ type RightPanelProps = {
     onBackToDay: (date: string) => void;
 
     onCreateNote: (formData: FormData) => Promise<void>;
-    onAfterCreate: () => Promise<void>; // refresh entries in App
+    onAfterCreate: () => Promise<void>; // after creating an entry,refresh entries in App
 
     // editing actions
     onUpdateNote: (id: number, body: { title?: string; time?: string; text?: string }) => Promise<void>;

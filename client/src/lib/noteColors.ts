@@ -6,6 +6,7 @@ type NoteColorConfig = {
     hex: string;     // solid color for small dots
 };
 
+// Assigns Tailwind classes and hex codes to each note color option.
 const NOTE_COLORS: Record<NoteColor, NoteColorConfig> = {
     red: {
         classes: 'bg-red-100 border-red-200 text-red-900',
@@ -43,6 +44,7 @@ const NOTE_COLORS: Record<NoteColor, NoteColorConfig> = {
 
 const DEFAULT_COLOR: NoteColor = 'blue';
 
+// Function for dropdowns and other places where we want to show all color options
 export const NOTE_COLOR_OPTIONS: NoteColor[] = [
     'red',
     'orange',
@@ -54,14 +56,17 @@ export const NOTE_COLOR_OPTIONS: NoteColor[] = [
     'gray',
 ];
 
+// Helper functions to get the Tailwind classes or hex code for a given note color (or default if undefined)
 export function getNoteColorConfig(color?: NoteColor): NoteColorConfig {
     return NOTE_COLORS[color ?? DEFAULT_COLOR];
 }
 
+// Gets the classes for the note background
 export function noteBg(color?: NoteColor): string {
     return getNoteColorConfig(color).classes;
 }
 
+// Gets the hex code for the note color (used in small dots on calendar)
 export function colorToHex(color?: NoteColor): string {
     return getNoteColorConfig(color).hex;
 }

@@ -35,6 +35,8 @@ export type EntriesByDate = Record<string, JournalEntry[]>;
 export type ForecastByDate = Record<string, WeatherSummary>;
 
 /** Possible colors for notes */
+// Restricts notes to only these predefined theme colors.
+// Ensures consistent styling and prevents invalid values.
 export type NoteColor =
     | 'red'
     | 'orange'
