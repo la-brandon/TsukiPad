@@ -320,8 +320,33 @@ const RightPanel: React.FC<RightPanelProps> = ({
                   {newPhotos.length > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
                       {newPhotos.map((f, i) => (
-                        <img key={i} src={URL.createObjectURL(f)} alt="preview"
-                          style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                        <div key={i} style={{ position: 'relative' }}>
+                          <img
+                            src={URL.createObjectURL(f)}
+                            alt="preview"
+                            style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setNewPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                            aria-label="Remove photo"
+                            style={{
+                              position: 'absolute', top: 3, right: 3,
+                              width: 18, height: 18,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: 'rgba(26,23,20,0.65)',
+                              border: 'none',
+                              borderRadius: '50%',
+                              color: '#fff',
+                              fontSize: '0.55rem',
+                              cursor: 'pointer',
+                              padding: 0,
+                              lineHeight: 1,
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
