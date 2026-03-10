@@ -22,7 +22,7 @@ type RightPanelProps = {
 };
 
 function formatLongDate(dateStr: string) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(dateStr).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -45,6 +45,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newTime, setNewTime] = useState('');
   const [newText, setNewText] = useState('');
@@ -104,6 +105,46 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
   return (
     <>
+      {/* Lightbox */}
+      {lightboxSrc && (
+        <div
+          onClick={() => setLightboxSrc(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(26,23,20,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'zoom-out',
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <img
+            src={lightboxSrc}
+            alt="Full size"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '88vh',
+              objectFit: 'contain',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-lg)',
+              cursor: 'default',
+            }}
+          />
+          <button
+            onClick={() => setLightboxSrc(null)}
+            style={{
+              position: 'absolute', top: '1.25rem', right: '1.25rem',
+              background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff', borderRadius: 'var(--radius-sm)',
+              width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', fontSize: '1rem',
+            }}
+            aria-label="Close photo"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* Backdrop */}
       {isOpen && (
         <div
@@ -358,8 +399,26 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       <p style={{ ...labelStyle, margin: '0 0 0.5rem' }}>Photos</p>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                         {selectedNote.photos.map((p, i) => (
-                          <img key={i} src={`http://localhost:3000${p}`} alt="saved"
-                            style={{ width: '100%', height: 88, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                          <img
+                            key={i}
+                            src={`http://localhost:3000${p}`}
+                            alt="saved"
+                            onClick={() => setLightboxSrc(`http://localhost:3000${p}`)}
+                            style={{
+                              width: '100%', height: 88, objectFit: 'cover',
+                              borderRadius: 'var(--radius-sm)',
+                              cursor: 'zoom-in',
+                              transition: 'opacity 0.15s, transform 0.15s',
+                            }}
+                            onMouseEnter={e => {
+                              (e.currentTarget as HTMLElement).style.opacity = '0.85';
+                              (e.currentTarget as HTMLElement).style.transform = 'scale(1.02)';
+                            }}
+                            onMouseLeave={e => {
+                              (e.currentTarget as HTMLElement).style.opacity = '1';
+                              (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                            }}
+                          />
                         ))}
                       </div>
                     </div>

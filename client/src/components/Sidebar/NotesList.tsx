@@ -2,7 +2,7 @@
  * NotesList.tsx — redesigned
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { JournalEntry, NoteColor } from '../../types';
 import { colorToHex } from '../../lib/noteColors';
 
@@ -17,32 +17,70 @@ function formatDateLabel(dateStr: string) {
 }
 
 const NotesList: React.FC<NotesListProps> = ({ title, notes, onSelectEntry }) => {
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   const grouped = useMemo(() => {
     const map: Record<string, JournalEntry[]> = {};
     for (const note of notes) {
       if (!map[note.date]) map[note.date] = [];
       map[note.date].push(note);
     }
-    const sortedDates = Object.keys(map).sort((a, b) => a.localeCompare(b));
+    const sortedDates = Object.keys(map).sort((a, b) =>
+      sortOrder === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+    );
     return { map, sortedDates };
-  }, [notes]);
+  }, [notes, sortOrder]);
 
   return (
     <div className="card" style={{ padding: '0.875rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
-        <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--ink)' }}>{title}</span>
-        {notes.length > 0 && (
-          <span style={{
-            fontSize: '0.65rem',
-            background: 'var(--paper-warm)',
-            border: '1px solid var(--border)',
-            borderRadius: '99px',
-            padding: '1px 7px',
-            color: 'var(--ink-muted)',
-            fontWeight: 500,
-          }}>
-            {notes.length}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--ink)' }}>{title}</span>
+          {notes.length > 0 && (
+            <span style={{
+              fontSize: '0.65rem',
+              background: 'var(--paper-warm)',
+              border: '1px solid var(--border)',
+              borderRadius: '99px',
+              padding: '1px 7px',
+              color: 'var(--ink-muted)',
+              fontWeight: 500,
+            }}>
+              {notes.length}
+            </span>
+          )}
+        </div>
+
+        {notes.length > 1 && (
+          <button
+            onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+            title={sortOrder === 'asc' ? 'Showing oldest first' : 'Showing newest first'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '2px 7px',
+              cursor: 'pointer',
+              fontSize: '0.65rem',
+              color: 'var(--ink-muted)',
+              fontFamily: 'var(--font-body)',
+              transition: 'background 0.12s, color 0.12s',
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'var(--paper-warm)';
+              (e.currentTarget as HTMLElement).style.color = 'var(--ink)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+              (e.currentTarget as HTMLElement).style.color = 'var(--ink-muted)';
+            }}
+          >
+            {sortOrder === 'asc' ? '↑ Oldest' : '↓ Newest'}
+          </button>
         )}
       </div>
 
