@@ -1,494 +1,449 @@
+/**
+ * RightPanel.tsx — redesigned
+ */
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { JournalEntry, NoteColor } from '../../types';
 import { NOTE_COLOR_OPTIONS, noteBg, colorToHex } from '../../lib/noteColors';
 
 type RightPanelProps = {
-    isOpen: boolean;
-    mode: 'day' | 'note';
-    date: string | null;
-    noteId: number | null;
-    entries: JournalEntry[];
-
-    onClose: () => void;
-
-    // navigation actions
-    onSelectNote: (id: number) => void;
-    onBackToDay: (date: string) => void;
-
-    onCreateNote: (formData: FormData) => Promise<void>;
-    onAfterCreate: () => Promise<void>; // after creating an entry,refresh entries in App
-
-    // editing actions
-    onUpdateNote: (id: number, body: { title?: string; time?: string; text?: string }) => Promise<void>;
-    onDeleteNote: (id: number) => Promise<void>;
+  isOpen: boolean;
+  mode: 'day' | 'note';
+  date: string | null;
+  noteId: number | null;
+  entries: JournalEntry[];
+  onClose: () => void;
+  onSelectNote: (id: number) => void;
+  onBackToDay: (date: string) => void;
+  onCreateNote: (formData: FormData) => Promise<void>;
+  onAfterCreate: () => Promise<void>;
+  onUpdateNote: (id: number, body: { title?: string; time?: string; text?: string }) => Promise<void>;
+  onDeleteNote: (id: number) => Promise<void>;
 };
 
 function formatLongDate(dateStr: string) {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
-    isOpen,
-    mode,
-    date,
-    noteId,
-    entries,
-    onClose,
-    onSelectNote,
-    onBackToDay,
-    onCreateNote,
-    onAfterCreate,
-    onUpdateNote,
-    onDeleteNote,
+  isOpen, mode, date, noteId, entries,
+  onClose, onSelectNote, onBackToDay,
+  onCreateNote, onAfterCreate, onUpdateNote, onDeleteNote,
 }) => {
-    // find the selected note
-    const selectedNote = useMemo(() => {
-        if (noteId == null) return null;
-        return entries.find(e => e.id === noteId) ?? null;
-    }, [noteId, entries]);
+  const selectedNote = useMemo(() =>
+    noteId == null ? null : entries.find(e => e.id === noteId) ?? null,
+    [noteId, entries]);
 
-    // Day list
-    const dayEntries = useMemo(() => {
-        if (!date) return [];
-        return entries.filter(e => e.date === date);
-    }, [date, entries]);
+  const dayEntries = useMemo(() =>
+    !date ? [] : entries.filter(e => e.date === date),
+    [date, entries]);
 
-    // view/edit mode for the note panel
-    const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState('');
+  const [time, setTime] = useState('');
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newTime, setNewTime] = useState('');
+  const [newText, setNewText] = useState('');
+  const [newPhotos, setNewPhotos] = useState<File[]>([]);
+  const [newColor, setNewColor] = useState<string>('blue');
 
-    // local edit form state
-    const [title, setTitle] = useState('');
-    const [time, setTime] = useState('');
-    const [text, setText] = useState('');
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [showCreate, setShowCreate] = useState(false);
-    const [newTitle, setNewTitle] = useState('');
-    const [newTime, setNewTime] = useState('');
-    const [newText, setNewText] = useState('');
-    const [newPhotos, setNewPhotos] = useState<File[]>([]);
-    const [newColor, setNewColor] = useState<string>('blue');
+  const createLabel = useMemo(() => {
+    if (!date) return 'Add';
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const d = new Date(date); d.setHours(0, 0, 0, 0);
+    return d < t ? 'Add Memory' : 'Add Reminder';
+  }, [date]);
 
+  async function handleCreate() {
+    if (!date) return;
+    if (!newTitle.trim()) { setError('Title is required'); return; }
+    setBusy(true); setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('date', date); fd.append('title', newTitle.trim());
+      fd.append('time', newTime); fd.append('text', newText); fd.append('color', newColor);
+      newPhotos.forEach(f => fd.append('photos', f));
+      await onCreateNote(fd); await onAfterCreate();
+      setNewTitle(''); setNewTime(''); setNewText(''); setNewPhotos([]); setNewColor('blue');
+      setShowCreate(false);
+    } catch (err: any) { setError(err.message || 'Failed to create'); }
+    finally { setBusy(false); }
+  }
 
-    const createLabel = useMemo(() => {
-        if (!date) return 'Add';
-        const t = new Date();
-        t.setHours(0, 0, 0, 0);
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        return d < t ? 'Add Memory' : 'Add Reminder';
-    }, [date]);
+  useEffect(() => {
+    setIsEditing(false); setError(null);
+    if (selectedNote) { setTitle(selectedNote.title ?? ''); setTime(selectedNote.time ?? ''); setText(selectedNote.text ?? ''); }
+  }, [selectedNote?.id]);
 
-    async function handleCreate() {
-        if (!date) return;
-        if (!newTitle.trim()) {
-            setError('Title is required');
-            return;
-        }
+  // Input style helper
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '0.5rem 0.75rem',
+    fontSize: '0.875rem',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'var(--paper)',
+    color: 'var(--ink)',
+    outline: 'none',
+    fontFamily: 'var(--font-body)',
+    boxSizing: 'border-box',
+  };
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: '0.7rem',
+    fontWeight: 500,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: 'var(--ink-muted)',
+    marginBottom: '0.375rem',
+  };
 
-        setBusy(true);
-        setError(null);
+  return (
+    <>
+      {/* Backdrop */}
+      {isOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 40,
+            background: 'rgba(26,23,20,0.18)',
+            backdropFilter: 'blur(2px)',
+          }}
+          onClick={onClose}
+        />
+      )}
 
-        try {
-            const fd = new FormData();
-            fd.append('date', date);
-            fd.append('title', newTitle.trim());
-            fd.append('time', newTime);
-            fd.append('text', newText);
-            fd.append('color', newColor);
-
-            newPhotos.forEach((file) => fd.append('photos', file)); // must match multer field name
-
-            await onCreateNote(fd);
-            await onAfterCreate();
-
-            // reset + collapse
-            setNewTitle('');
-            setNewTime('');
-            setNewText('');
-            setNewPhotos([]);
-            setNewColor('blue');
-            setShowCreate(false);
-        } catch (err: any) {
-            setError(err.message || 'Failed to create note');
-        } finally {
-            setBusy(false);
-        }
-    }
-
-    // when note changes, reset editing + load form fields
-    useEffect(() => {
-        setIsEditing(false);
-        setError(null);
-
-        if (selectedNote) {
-            setTitle(selectedNote.title ?? '');
-            setTime(selectedNote.time ?? '');
-            setText(selectedNote.text ?? '');
-        }
-    }, [selectedNote?.id]);
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-50">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-
-            {/* Panel */}
-            <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl border-l flex flex-col">
-                {/* Header */}
-                <div className="p-4 border-b flex items-start justify-between gap-3">
-                    <div>
-                        {mode === 'day' ? (
-                            <div className="w-full">
-                                <div className="text-sm text-gray-500">Notes for</div>
-                                <div className="flex items-center justify-between gap-3">
-                                    <div className="text-lg font-semibold">
-                                        {date ? formatLongDate(date) : '—'}
-                                    </div>
-                                    {date && (
-                                        <button
-                                            onClick={() => setShowCreate((v) => !v)}
-                                            className="px-3 py-2 rounded bg-gray-900 text-white text-sm hover:bg-black"
-                                        >
-                                            {createLabel}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Back button */}
-                                <button
-                                    onClick={() => {
-                                        if (selectedNote?.date) {
-                                            setIsEditing(false);
-                                            onBackToDay(selectedNote.date);
-                                        }
-                                    }}
-                                    className="text-xs text-blue-600 hover:underline mb-1"
-                                >
-                                    ← Back to day
-                                </button>
-
-                                <div className="text-sm text-gray-500">Viewing</div>
-                                <div className="text-lg font-semibold truncate">
-                                    {selectedNote?.title ?? '—'}
-                                </div>
-
-                                {selectedNote?.date && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                        {formatLongDate(selectedNote.date)} {selectedNote.time ? `• ${selectedNote.time}` : ''}
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-
+      {/* Slide-in panel */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0, right: 0, bottom: 0,
+          width: '100%', maxWidth: 420,
+          zIndex: 50,
+          background: 'var(--paper-card)',
+          borderLeft: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-lg)',
+          display: 'flex', flexDirection: 'column',
+          transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '1.25rem 1.25rem 1rem',
+          borderBottom: '1px solid var(--border-soft)',
+          flexShrink: 0,
+        }}>
+          {mode === 'day' ? (
+            <div>
+              <p style={{ fontSize: '0.7rem', color: 'var(--ink-muted)', margin: '0 0 0.25rem', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                Notes for
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, margin: 0, color: 'var(--ink)', letterSpacing: '-0.02em' }}>
+                  {date ? formatLongDate(date) : '—'}
+                </h3>
+                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                  {date && (
                     <button
-                        onClick={onClose}
-                        className="text-gray-500 hover:text-gray-700 text-sm"
-                        aria-label="Close"
+                      className="btn-primary"
+                      onClick={() => setShowCreate(v => !v)}
+                      style={{ padding: '0.375rem 0.875rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
                     >
-                        ✕
+                      {createLabel}
                     </button>
+                  )}
+                  <button
+                    onClick={onClose}
+                    style={{
+                      width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--ink-muted)',
+                      fontSize: '1rem', flexShrink: 0,
+                    }}
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
                 </div>
-
-                {/* Body */}
-                <div className="p-4 flex-1 overflow-auto">
-                    {mode === 'day' && (
-                        <>
-                            {showCreate && date && (
-                                <div className="mb-4 p-3 rounded-lg border bg-gray-50 space-y-2">
-                                    <div className="text-sm font-semibold">
-                                        {createLabel} for {formatLongDate(date)}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Title</label>
-                                        <input
-                                            value={newTitle}
-                                            onChange={(e) => setNewTitle(e.target.value)}
-                                            className="w-full border rounded px-2 py-1 text-sm"
-                                            placeholder="e.g. Dentist appointment"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Time (optional)</label>
-                                        <input
-                                            type="time"
-                                            value={newTime}
-                                            onChange={(e) => setNewTime(e.target.value)}
-                                            className="w-full border rounded px-2 py-1 text-sm"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Color</label>
-
-                                        <div className="flex flex-wrap gap-2">
-                                            {NOTE_COLOR_OPTIONS.map((c: NoteColor) => (
-                                                <button
-                                                    key={c}
-                                                    type="button"
-                                                    onClick={() => setNewColor(c)}
-                                                    className={[
-                                                        'w-6 h-6 rounded-full border',
-                                                        newColor === c ? 'ring-2 ring-black/40' : '',
-                                                    ].join(' ')}
-                                                    style={{ backgroundColor: colorToHex(c) }}
-                                                    aria-label={`Set color ${c}`}
-                                                    title={c}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Details (optional)</label>
-                                        <textarea
-                                            value={newText}
-                                            onChange={(e) => setNewText(e.target.value)}
-                                            className="w-full border rounded px-2 py-1 text-sm resize-none"
-                                            rows={3}
-                                            placeholder="Add extra details..."
-                                        />
-                                    </div>
-
-                                    {/* Photos */}
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Photos (optional)</label>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={(e) => {
-                                                const files = e.target.files ? Array.from(e.target.files) : [];
-                                                setNewPhotos(files);
-                                            }}
-                                            className="w-full text-xs"
-                                        />
-                                    </div>
-
-                                    {newPhotos.length > 0 && (
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {newPhotos.map((file, idx) => (
-                                                <img
-                                                    key={idx}
-                                                    src={URL.createObjectURL(file)}
-                                                    className="w-full h-16 object-cover rounded"
-                                                    alt="preview"
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    <div className="flex gap-2 pt-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCreate(false)}
-                                            className="flex-1 px-3 py-2 rounded border text-sm hover:bg-white"
-                                            disabled={busy}
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleCreate}
-                                            className="flex-1 px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-60"
-                                            disabled={busy}
-                                        >
-                                            {busy ? 'Saving...' : 'Save'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {dayEntries.length === 0 ? (
-                                <p className="text-sm text-gray-500">No notes for this day yet.</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {dayEntries.map((e) => (
-                                        <button
-                                            onClick={() => onSelectNote(e.id!)}
-                                            className={[
-                                                'w-full text-left p-3 rounded-lg border',
-                                                'hover:brightness-95',
-                                                noteBg(e.color as NoteColor),
-                                            ].join(' ')}
-                                        >
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span
-                                                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                                                        style={{ backgroundColor: colorToHex(e.color as NoteColor) }}
-                                                    />
-                                                    <div className="font-semibold text-sm truncate">{e.title}</div>
-                                                </div>
-                                                {e.time && <div className="text-xs text-gray-500">{e.time}</div>}
-                                            </div>
-                                            {e.text && (
-                                                <div className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                                    {e.text}
-                                                </div>
-                                            )}
-                                        </button>
-
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {mode === 'note' && selectedNote && (
-                        <>
-                            {/* View mode */}
-                            {!isEditing && (
-                                <div className="space-y-3">
-                                    {selectedNote.text ? (
-                                        <p className="text-sm whitespace-pre-wrap">{selectedNote.text}</p>
-                                    ) : (
-                                        <p className="text-sm text-gray-500">No details.</p>
-                                    )}
-
-                                    {/* Photos */}
-                                    {selectedNote.photos && selectedNote.photos.length > 0 && (
-                                        <div>
-                                            <div className="text-xs font-semibold text-gray-600 mb-2">Photos</div>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {selectedNote.photos.map((p, idx) => (
-                                                    <img
-                                                        key={idx}
-                                                        src={`http://localhost:3000${p}`}
-                                                        className="w-full h-24 object-cover rounded"
-                                                        alt="saved"
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Edit mode */}
-                            {isEditing && (
-                                <form
-                                    className="space-y-3"
-                                    onSubmit={async (ev) => {
-                                        ev.preventDefault();
-                                        setBusy(true);
-                                        setError(null);
-                                        try {
-                                            await onUpdateNote(selectedNote.id!, { title, time, text });
-                                            setIsEditing(false);
-                                        } catch (err: any) {
-                                            setError(err.message || 'Failed to update');
-                                        } finally {
-                                            setBusy(false);
-                                        }
-                                    }}
-                                >
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Title</label>
-                                        <input
-                                            value={title}
-                                            onChange={(e) => setTitle(e.target.value)}
-                                            className="w-full border rounded px-2 py-1 text-sm"
-                                            required
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Time</label>
-                                        <input
-                                            type="time"
-                                            value={time}
-                                            onChange={(e) => setTime(e.target.value)}
-                                            className="w-full border rounded px-2 py-1 text-sm"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-medium mb-1">Details</label>
-                                        <textarea
-                                            value={text}
-                                            onChange={(e) => setText(e.target.value)}
-                                            className="w-full border rounded px-2 py-1 text-sm resize-none"
-                                            rows={5}
-                                        />
-                                    </div>
-
-                                    {error && <div className="text-xs text-red-600">{error}</div>}
-
-                                    <button
-                                        type="submit"
-                                        disabled={busy}
-                                        className="w-full px-3 py-2 rounded bg-blue-600 text-white text-sm disabled:opacity-60"
-                                    >
-                                        {busy ? 'Saving...' : 'Save Changes'}
-                                    </button>
-                                </form>
-                            )}
-                        </>
-                    )}
-                </div>
-
-                {/* Footer actions */}
-                <div className="p-4 border-t flex items-center justify-between gap-2">
-                    {mode === 'note' && selectedNote ? (
-                        <>
-                            <button
-                                onClick={async () => {
-                                    if (!window.confirm('Delete this note?')) return;
-                                    setBusy(true);
-                                    setError(null);
-                                    try {
-                                        await onDeleteNote(selectedNote.id!);
-                                        onClose();
-                                    } catch (err: any) {
-                                        setError(err.message || 'Failed to delete');
-                                    } finally {
-                                        setBusy(false);
-                                    }
-                                }}
-                                className="px-3 py-2 rounded border border-red-500 text-red-600 text-sm disabled:opacity-60"
-                                disabled={busy}
-                            >
-                                Delete
-                            </button>
-
-                            <div className="flex gap-2">
-                                {!isEditing ? (
-                                    <button
-                                        onClick={() => setIsEditing(true)}
-                                        className="px-3 py-2 rounded bg-gray-900 text-white text-sm"
-                                        disabled={busy}
-                                    >
-                                        Edit
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => setIsEditing(false)}
-                                        className="px-3 py-2 rounded border text-sm"
-                                        disabled={busy}
-                                    >
-                                        Cancel Edit
-                                    </button>
-                                )}
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-xs text-gray-500">
-                            Tip: click an item to view details.
-                        </div>
-                    )}
-                </div>
+              </div>
             </div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
+                <button
+                  onClick={() => { if (selectedNote?.date) { setIsEditing(false); onBackToDay(selectedNote.date); } }}
+                  style={{
+                    background: 'transparent', border: 'none', padding: 0,
+                    fontSize: '0.8rem', color: 'var(--blush)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.25rem',
+                  }}
+                >
+                  ← Back to day
+                </button>
+                <button
+                  onClick={onClose}
+                  style={{
+                    width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'transparent', border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)', cursor: 'pointer', color: 'var(--ink-muted)',
+                    fontSize: '1rem',
+                  }}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 600, margin: 0, color: 'var(--ink)', letterSpacing: '-0.02em' }}>
+                {selectedNote?.title ?? '—'}
+              </h3>
+              {selectedNote?.date && (
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                  {formatLongDate(selectedNote.date)}{selectedNote.time ? ` · ${selectedNote.time}` : ''}
+                </p>
+              )}
+            </div>
+          )}
         </div>
-    );
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+          {mode === 'day' && (
+            <>
+              {/* Create form */}
+              {showCreate && date && (
+                <div style={{
+                  marginBottom: '1.25rem',
+                  padding: '1rem',
+                  background: 'var(--paper-warm)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex', flexDirection: 'column', gap: '0.875rem',
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 500, color: 'var(--ink)' }}>
+                    {createLabel}
+                  </p>
+
+                  <div>
+                    <label style={labelStyle}>Title</label>
+                    <input
+                      value={newTitle}
+                      onChange={e => setNewTitle(e.target.value)}
+                      placeholder="e.g. Dentist appointment"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Time (optional)</label>
+                    <input type="time" value={newTime} onChange={e => setNewTime(e.target.value)} style={inputStyle} />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Color</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {NOTE_COLOR_OPTIONS.map(c => (
+                        <button
+                          key={c} type="button"
+                          className={`color-dot${newColor === c ? ' selected' : ''}`}
+                          style={{ backgroundColor: colorToHex(c), border: '2px solid transparent' }}
+                          onClick={() => setNewColor(c)}
+                          aria-label={c} title={c}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Details (optional)</label>
+                    <textarea
+                      value={newText} onChange={e => setNewText(e.target.value)}
+                      placeholder="Add extra details..."
+                      rows={3}
+                      style={{ ...inputStyle, resize: 'none' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Photos (optional)</label>
+                    <input
+                      type="file" accept="image/*" multiple
+                      onChange={e => setNewPhotos(e.target.files ? Array.from(e.target.files) : [])}
+                      style={{ ...inputStyle, padding: '0.375rem' }}
+                    />
+                  </div>
+
+                  {newPhotos.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                      {newPhotos.map((f, i) => (
+                        <img key={i} src={URL.createObjectURL(f)} alt="preview"
+                          style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                      ))}
+                    </div>
+                  )}
+
+                  {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#c0392b' }}>{error}</p>}
+
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn-ghost" onClick={() => setShowCreate(false)} disabled={busy} style={{ flex: 1 }}>Cancel</button>
+                    <button className="btn-primary" onClick={handleCreate} disabled={busy} style={{ flex: 1 }}>
+                      {busy ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Day entries list */}
+              {dayEntries.length === 0 ? (
+                <p style={{ fontSize: '0.875rem', color: 'var(--ink-muted)', margin: 0 }}>
+                  No notes for this day yet.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {dayEntries.map(e => (
+                    <button
+                      key={e.id}
+                      onClick={() => onSelectNote(e.id!)}
+                      style={{
+                        width: '100%', textAlign: 'left',
+                        padding: '0.75rem 1rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: `1px solid ${colorToHex(e.color as NoteColor)}44`,
+                        background: `${colorToHex(e.color as NoteColor)}11`,
+                        cursor: 'pointer',
+                        transition: 'filter 0.12s',
+                        display: 'flex', flexDirection: 'column', gap: '0.25rem',
+                      }}
+                      onMouseEnter={el => (el.currentTarget.style.filter = 'brightness(0.96)')}
+                      onMouseLeave={el => (el.currentTarget.style.filter = 'brightness(1)')}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: colorToHex(e.color as NoteColor) }} />
+                          <span style={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)' }}>
+                            {e.title}
+                          </span>
+                        </div>
+                        {e.time && <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', flexShrink: 0 }}>{e.time}</span>}
+                      </div>
+                      {e.text && (
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--ink-soft)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                          {e.text}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {mode === 'note' && selectedNote && (
+            <>
+              {!isEditing && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {selectedNote.text ? (
+                    <p style={{ fontSize: '0.9rem', lineHeight: 1.65, whiteSpace: 'pre-wrap', color: 'var(--ink)', margin: 0 }}>
+                      {selectedNote.text}
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: '0.875rem', color: 'var(--ink-muted)', margin: 0 }}>No details added.</p>
+                  )}
+
+                  {selectedNote.photos && selectedNote.photos.length > 0 && (
+                    <div>
+                      <p style={{ ...labelStyle, margin: '0 0 0.5rem' }}>Photos</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                        {selectedNote.photos.map((p, i) => (
+                          <img key={i} src={`http://localhost:3000${p}`} alt="saved"
+                            style={{ width: '100%', height: 88, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {isEditing && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                  <div>
+                    <label style={labelStyle}>Title</label>
+                    <input value={title} onChange={e => setTitle(e.target.value)} required style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Time</label>
+                    <input type="time" value={time} onChange={e => setTime(e.target.value)} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Details</label>
+                    <textarea value={text} onChange={e => setText(e.target.value)} rows={6} style={{ ...inputStyle, resize: 'none' }} />
+                  </div>
+                  {error && <p style={{ margin: 0, fontSize: '0.8rem', color: '#c0392b' }}>{error}</p>}
+                  <button
+                    className="btn-primary"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true); setError(null);
+                      try { await onUpdateNote(selectedNote.id!, { title, time, text }); setIsEditing(false); }
+                      catch (err: any) { setError(err.message || 'Failed to update'); }
+                      finally { setBusy(false); }
+                    }}
+                    style={{ width: '100%', padding: '0.625rem' }}
+                  >
+                    {busy ? 'Saving…' : 'Save Changes'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '1rem 1.25rem',
+          borderTop: '1px solid var(--border-soft)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: mode === 'note' && selectedNote ? 'space-between' : 'flex-end',
+          gap: '0.5rem',
+          flexShrink: 0,
+        }}>
+          {mode === 'note' && selectedNote ? (
+            <>
+              <button
+                className="btn-danger"
+                disabled={busy}
+                onClick={async () => {
+                  if (!window.confirm('Delete this note?')) return;
+                  setBusy(true);
+                  try { await onDeleteNote(selectedNote.id!); onClose(); }
+                  catch (err: any) { setError(err.message || 'Failed to delete'); }
+                  finally { setBusy(false); }
+                }}
+              >
+                Delete
+              </button>
+              <button
+                className={isEditing ? 'btn-ghost' : 'btn-primary'}
+                disabled={busy}
+                onClick={() => setIsEditing(v => !v)}
+                style={{ padding: '0.375rem 1rem' }}
+              >
+                {isEditing ? 'Cancel' : 'Edit'}
+              </button>
+            </>
+          ) : (
+            <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+              Click a note to view details
+            </span>
+          )}
+        </div>
+      </div>
+    </>
+  );
 };
 
 export default RightPanel;

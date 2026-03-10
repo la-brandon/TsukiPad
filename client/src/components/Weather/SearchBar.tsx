@@ -1,13 +1,6 @@
 /**
- * SearchBar.tsx
- *
- * Simple controlled input field that lets users type a city name.
- * On submit, calls the onSearch callback provided by the parent.
- *
- * Props:
- *  - onSearch(city: string)
+ * SearchBar.tsx — redesigned
  */
-
 
 import { useState } from 'react';
 
@@ -20,22 +13,38 @@ function SearchBar({ onSearch }: SearchBarProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (city.trim()) onSearch(city);
+    if (city.trim()) onSearch(city.trim());
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2 mb-6">
+    <div style={{ display: 'flex', gap: '0.5rem' }}>
       <input
         type="text"
         value={city}
-        onChange={(e) => setCity(e.target.value)}
-        placeholder="Enter city name"
-        className="border border-gray-300 rounded px-4 py-2 w-64 focus:outline-none focus:ring"
+        onChange={e => setCity(e.target.value)}
+        placeholder="Search city…"
+        onKeyDown={e => e.key === 'Enter' && handleSubmit(e as any)}
+        style={{
+          flex: 1,
+          padding: '0.5rem 0.75rem',
+          fontSize: '0.8125rem',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--paper-card)',
+          color: 'var(--ink)',
+          outline: 'none',
+          fontFamily: 'var(--font-body)',
+          minWidth: 0,
+        }}
       />
-      <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-        Search
+      <button
+        onClick={handleSubmit as any}
+        className="btn-primary"
+        style={{ padding: '0.5rem 0.875rem', fontSize: '0.8rem', flexShrink: 0 }}
+      >
+        Go
       </button>
-    </form>
+    </div>
   );
 }
 

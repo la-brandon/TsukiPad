@@ -1,194 +1,181 @@
 /**
- * MonthlyCalendar.tsx
- *
- * Renders a full monthly calendar grid (Sun–Sat).
- * Responsibilities:
- *  - Build month view including leading/trailing empty cells
- *  - Display weather forecast icons + temperatures per day
- *  - Group journal entries per date and show them inside day cells
- *  - Notify parent when user clicks a day or an entry
- *
- * Props:
- *  - currentMonth: Date                → The month to display
- *  - journalEntries: JournalEntry[]    → All entries, grouped by date
- *  - forecastByDate: Record<string, WeatherSummary> → Weather info for each date
- *  - onPrevMonth / onNextMonth         → Navigation callbacks
- *  - onSelectDate                      → Click empty day → open Add Note
- *  - onSelectEntry                     → Click entry → open Edit Note
+ * MonthlyCalendar.tsx — redesigned
  */
-
-
 
 import React from 'react';
 import { JournalEntry, EntriesByDate, ForecastByDate } from '../../types';
-import { noteBg } from '../../lib/noteColors';
+import { noteBg, colorToHex } from '../../lib/noteColors';
+import { NoteColor } from '../../types';
 
 type MonthlyCalendarProps = {
-    currentMonth: Date;
-    journalEntries: JournalEntry[];
-    forecastByDate?: ForecastByDate;
-    onPrevMonth: () => void;
-    onNextMonth: () => void;
-    onSelectDate?: (date: string) => void;
-    onSelectEntry?: (entryId: number) => void;
+  currentMonth: Date;
+  journalEntries: JournalEntry[];
+  forecastByDate?: ForecastByDate;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  onSelectDate?: (date: string) => void;
+  onSelectEntry?: (entryId: number) => void;
 };
 
-
-// Helper: format date as "YYYY-MM-DD"
 function formatDate(d: Date): string {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 export default function MonthlyCalendar({
-    currentMonth,
-    journalEntries,
-    forecastByDate = {},
-    onPrevMonth,
-    onNextMonth,
-    onSelectDate,
-    onSelectEntry,
+  currentMonth,
+  journalEntries,
+  forecastByDate = {},
+  onPrevMonth,
+  onNextMonth,
+  onSelectDate,
+  onSelectEntry,
 }: MonthlyCalendarProps) {
-    const year = currentMonth.getFullYear();
-    const monthIndex = currentMonth.getMonth(); // 0–11
+  const year = currentMonth.getFullYear();
+  const monthIndex = currentMonth.getMonth();
+  const todayStr = formatDate(new Date());
 
-    const todayStr = formatDate(new Date());
-    const firstOfMonth = new Date(year, monthIndex, 1);
-    const firstWeekday = firstOfMonth.getDay(); // 0=Sun ... 6=Sat
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const firstWeekday = new Date(year, monthIndex, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
-    // Build a map: date string -> entries[]
-    const entriesByDate: EntriesByDate = {};
-    journalEntries.forEach(entry => {
-        if (!entry.date) return;
-        if (!entriesByDate[entry.date]) {
-            entriesByDate[entry.date] = [];
-        }
-        entriesByDate[entry.date].push(entry);
-    });
+  const entriesByDate: EntriesByDate = {};
+  journalEntries.forEach(entry => {
+    if (!entry.date) return;
+    if (!entriesByDate[entry.date]) entriesByDate[entry.date] = [];
+    entriesByDate[entry.date].push(entry);
+  });
 
+  const cells: { date: string | null; day: number | null }[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push({ date: null, day: null });
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push({ date: formatDate(new Date(year, monthIndex, day)), day });
+  }
 
-    // Build cells for the grid (including leading blanks)
-    const cells: { date: string | null; dayOfMonth: number | null }[] = [];
-
-    // Leading blank cells before the 1st of the month
-    for (let i = 0; i < firstWeekday; i++) {
-        cells.push({ date: null, dayOfMonth: null });
-    }
-
-    // Actual days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-        const cellDate = new Date(year, monthIndex, day);
-        const dateStr = formatDate(cellDate);
-        cells.push({ date: dateStr, dayOfMonth: day });
-    }
-
-    const monthName = currentMonth.toLocaleString('default', { month: 'long' });
-
-    return (
-        <div className="w-full h-full flex flex-col">
-            {/* Month header with nav */}
-            <div className="flex items-center justify-between mb-4">
-                <button
-                    onClick={onPrevMonth}
-                    className="px-2 py-1 border rounded text-sm"
-                >
-                    ◀
-                </button>
-                <h2 className="text-2xl font-semibold">
-                    {monthName} {year}
-                </h2>
-                <button
-                    onClick={onNextMonth}
-                    className="px-2 py-1 border rounded text-sm"
-                >
-                    ▶
-                </button>
-            </div>
-
-            {/* Day-of-week headers */}
-            <div className="grid grid-cols-7 gap-1 text-center font-medium mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                    <div key={d} className="text-xs sm:text-sm">
-                        {d}
-                    </div>
-                ))}
-            </div>
-
-            {/* Calendar cells */}
-            <div className="grid grid-cols-7 gap-1 text-xs sm:text-sm flex-1 [grid-auto-rows:1fr]">
-                {cells.map((cell, index) => {
-                    if (cell.date === null) {
-                        return <div key={index} className="h-full" />;
-                    }
-
-                    const entries = entriesByDate[cell.date] || [];
-                    const weather = cell.date ? forecastByDate[cell.date] : undefined;
-                    const isToday = cell.date === todayStr;
-
-                    return (
-                        <div
-                            key={cell.date}
-                            className="border rounded p-1 sm:p-2 h-full flex flex-col min-h-0 cursor-pointer hover:bg-gray-100"
-                            onClick={() => onSelectDate && onSelectDate(cell.date!)}
-                        >
-                            <div className="flex items-center justify-between">
-                                <span className="font-semibold">{cell.dayOfMonth}</span>
-
-                                {isToday && (
-                                    <span className="text-[9px] text-blue-600 font-semibold">
-                                        Today
-                                    </span>
-                                )}
-                            </div>
-
-                            {weather && (
-                                <div className="flex items-center gap-1 mt-1">
-                                    <img
-                                        src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
-                                        alt={weather.weather}
-                                        className="w-6 h-6"
-                                    />
-                                    <span className="text-[10px] sm:text-xs">
-                                        H: {Math.round(weather.tempMax)}° / L: {Math.round(weather.tempMin)}°
-                                    </span>
-                                </div>
-                            )}
-
-                            <div className="mt-1 space-y-1 overflow-auto">
-                                {entries.map((entry, i) => (
-                                    <button
-                                        key={entry.id ?? i}
-                                        className={[
-                                            "mt-1 w-full text-left",
-                                            "text-[10px] sm:text-xs",
-                                            "truncate",
-                                            "px-2 py-1 rounded",
-                                            "border",
-                                            "hover:brightness-95",
-                                            noteBg(entry.color ?? 'blue'),
-                                        ].join(" ")}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (entry.id != null && onSelectEntry) {
-                                                onSelectEntry(entry.id);
-                                            }
-                                        }}
-                                        type="button"
-                                    >
-                                        • {entry.title}
-                                    </button>
-
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1.25rem' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+          <h2 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '1.75rem',
+            fontWeight: 600,
+            color: 'var(--ink)',
+            letterSpacing: '-0.03em',
+            lineHeight: 1,
+            margin: 0,
+          }}>
+            {MONTH_NAMES[monthIndex]}
+          </h2>
+          <span style={{ fontSize: '1rem', color: 'var(--ink-muted)', fontWeight: 300 }}>{year}</span>
         </div>
-    );
 
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="btn-nav" onClick={onPrevMonth} aria-label="Previous month">‹</button>
+          <button className="btn-nav" onClick={onNextMonth} aria-label="Next month">›</button>
+        </div>
+      </div>
+
+      {/* Day labels */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+        {DAYS.map(d => (
+          <div key={d} style={{
+            textAlign: 'center',
+            fontSize: '0.65rem',
+            fontWeight: 500,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-muted)',
+            paddingBottom: '0.25rem',
+          }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(7, 1fr)',
+        gridAutoRows: '1fr',
+        gap: '4px',
+        flex: 1,
+      }}>
+        {cells.map((cell, idx) => {
+          if (!cell.date) return <div key={idx} />;
+
+          const entries = entriesByDate[cell.date] || [];
+          const weather = forecastByDate[cell.date];
+          const isToday = cell.date === todayStr;
+
+          return (
+            <div
+              key={cell.date}
+              className={`cal-cell${isToday ? ' is-today' : ''}`}
+              onClick={() => onSelectDate?.(cell.date!)}
+              style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            >
+              {/* Day number row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <span style={{
+                  fontSize: '0.80rem',
+                  fontWeight: isToday ? 600 : 400,
+                  color: isToday ? 'var(--blush)' : 'var(--ink)',
+                  lineHeight: 1,
+                }}>
+                  {cell.day}
+                </span>
+
+                {weather && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <img
+                      src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
+                      alt={weather.weather}
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <span style={{ fontSize: '0.80rem', color: 'var(--ink-muted)', lineHeight: 1 }}>
+                      {Math.round(weather.tempMax)}°
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Note pills */}
+              <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {entries.slice(0, 3).map((entry, i) => (
+                  <button
+                    key={entry.id ?? i}
+                    className="note-pill"
+                    style={{
+                      backgroundColor: `${colorToHex(entry.color as NoteColor)}22`,
+                      borderColor: `${colorToHex(entry.color as NoteColor)}55`,
+                      color: 'var(--ink-soft)',
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (entry.id != null) onSelectEntry?.(entry.id);
+                    }}
+                    type="button"
+                  >
+                    {entry.title}
+                  </button>
+                ))}
+                {entries.length > 3 && (
+                  <span style={{ fontSize: '0.6rem', color: 'var(--ink-muted)', paddingLeft: '2px' }}>
+                    +{entries.length - 3} more
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
